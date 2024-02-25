@@ -1,0 +1,21 @@
+<meta charset="UTF-8">
+<div>输入密码获取 flag12 (密码范围: 0 ~ 4294967295): <input type="text"><button>获取 flag12</button></div>
+<div id="result"></div>
+<script>
+    WebAssembly.instantiateStreaming(fetch('flag12.wasm'))
+        .then(({instance}) => {
+            const get_flag12 = (secret) => {
+                let num = instance.exports.get_flag12(secret);
+                let str = '';
+                while (num > 0) {
+                    str = String.fromCodePoint(num & 0xff) + str;
+                    num >>= 8;
+                }
+                return `flag12{${str}}`;
+            }
+            document.querySelector('button').addEventListener('click', (e) => {
+                e.preventDefault();
+                document.querySelector('#result').textContent = get_flag12(parseInt(document.querySelector('input').value));
+            });
+        });
+</script>

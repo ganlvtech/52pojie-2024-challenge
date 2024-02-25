@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <script src="react.production.min.js"></script>
+    <script src="react-dom.production.min.js"></script>
+    <script src="babel.min.js"></script>
+    <style>
+        body {
+            background: #faf8ef;
+        }
+
+        .tiles-table {
+            border-collapse: collapse;
+        }
+
+        .tile {
+            padding: 0;
+            width: 140px;
+            height: 140px;
+            box-sizing: border-box;
+            color: #776e65;
+            background: #cdc1b4;
+            border: 20px solid #bbada0;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .tile-2 {
+            background: #eee4da;
+            font-size: 55px;
+        }
+
+        .tile-4 {
+            background: #ede0c8;
+            font-size: 55px;
+        }
+
+        .tile-8 {
+            color: #f9f6f2;
+            background: #f2b179;
+            font-size: 55px;
+        }
+
+        .tile-16 {
+            color: #f9f6f2;
+            background: #f59563;
+            font-size: 55px;
+        }
+
+        .tile-32 {
+            color: #f9f6f2;
+            background: #f67c5f;
+            font-size: 55px;
+        }
+
+        .tile-64 {
+            color: #f9f6f2;
+            background: #f65e3b;
+            font-size: 55px;
+        }
+
+        .tile-128 {
+            color: #f9f6f2;
+            background: #edcf72;
+            font-size: 45px;
+        }
+
+        .tile-256 {
+            color: #f9f6f2;
+            background: #edcc61;
+            font-size: 45px;
+        }
+
+        .tile-512 {
+            color: #f9f6f2;
+            background: #edc850;
+            font-size: 45px;
+        }
+
+        .tile-1024 {
+            color: #f9f6f2;
+            background: #edc53f;
+            font-size: 35px;
+        }
+
+        .tile-2048 {
+            color: #f9f6f2;
+            background: #edc22e;
+            font-size: 35px;
+        }
+
+        .tile-4096, .tile-8192 {
+            color: #f9f6f2;
+            background: #3c3a32;
+            font-size: 35px;
+        }
+
+        .tile-16384, .tile-32768, .tile-65536 {
+            color: #f9f6f2;
+            background: #3c3a32;
+            font-size: 25px;
+        }
+
+        .shop-table {
+            border-collapse: collapse;
+        }
+
+        .shop-table th,
+        .shop-table td {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+        const request = (url, options) => fetch(url, options).then(res => res.json()).then(res => {
+            if (res.code === 0) {
+                return res.data;
+            } else {
+                alert(res.msg);
+            }
+        }).catch((e) => {
+            console.log(e);
+        });
+        const get_info = () => request('/flagB/info');
+        const restart = () => request('/flagB/restart', {method: 'POST'});
+        const move = (direction) => request('/flagB/move', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: `direction=${encodeURIComponent(direction)}`});
+        const get_shop = () => request('/flagB/shop');
+        const buy_item = (shop_item_id, buy_count) => request('/flagB/buy_item', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: `shop_item_id=${encodeURIComponent(shop_item_id)}&buy_count=${encodeURIComponent(buy_count)}`});
+        const use_item = (item_id) => request('/flagB/use_item', {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: `item_id=${encodeURIComponent(item_id)}`});
+        const MOVE_UP = 1;
+        const MOVE_DOWN = 2;
+        const MOVE_LEFT = 3;
+        const MOVE_RIGHT = 4;
+
+        function App() {
+            const [info, setInfo] = React.useState({});
+            const [shopItemList, setShopItemList] = React.useState([]);
+            const [buyCount, setBuyCount] = React.useState(1);
+
+            React.useEffect(() => {
+                get_shop().then(res => setShopItemList(res));
+            }, []);
+
+            const reload = React.useCallback(() => {
+                get_info().then(res => setInfo(res));
+            }, []);
+
+            React.useEffect(() => {
+                reload();
+            }, [reload]);
+
+            React.useEffect(() => {
+                const onKeyDown = (e) => {
+                    let direction = null;
+                    if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+                        direction = MOVE_UP;
+                    } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+                        direction = MOVE_DOWN;
+                    } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+                        direction = MOVE_LEFT;
+                    } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+                        direction = MOVE_RIGHT;
+                    }
+                    if (direction) {
+                        e.preventDefault();
+                        move(direction).then(res => setInfo(res));
+                    }
+                };
+                window.addEventListener('keydown', onKeyDown);
+                return () => {
+                    window.removeEventListener('keydown', onKeyDown);
+                }
+            }, []);
+
+            return (
+                <div>
+                    <div style={{margin: '1em auto'}}>
+                        <p style={{margin: '1em 0', textAlign: 'center'}}>玩一玩 2048 游戏吧，使用 WASD 或上下左右操作。得分会增加金币，金币能购买到你想要的东西。</p>
+                        {info?.game_data?.game_over && <div style={{position: 'absolute', top: '4em', left: '0', right: '0', padding: '2em 0', color: '#f99', backgroundColor: 'rgba(255, 255, 255, .7)', fontSize: '2em', fontWeight: 'bold', textAlign: 'center'}}>Game Over!</div>}
+                        <table style={{margin: '1em auto'}} className="tiles-table">
+                            {Array(4).fill(null).map((_, j) => (
+                                <tr>
+                                    {Array(4).fill(null).map((_, i) => (
+                                        <td className={`tile tile-${info?.game_data?.tiles?.[j * 4 + i]}`}>{info?.game_data?.tiles?.[j * 4 + i] || ''}</td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </table>
+                        <div style={{textAlign: 'center'}}>
+                            <span style={{marginRight: '1em'}}>分数: {info?.game_data?.score || 0}</span>
+                            <span style={{marginRight: '1em'}}>金币: {info?.money_count || 0}</span>
+                            {info?.double_money_buff && <span style={{marginRight: '1em'}}>下次操作双倍金币</span>}
+                            <button onClick={() => {
+                                restart().then(() => reload());
+                            }}>重新开始(消耗200金币)
+                            </button>
+                        </div>
+                    </div>
+                    <div style={{margin: '1em auto'}}>
+                        <div style={{textAlign: 'center'}}>
+                            <span style={{marginRight: '1em'}}>商店</span>
+                        </div>
+                        <table className="shop-table" style={{margin: '1em auto'}}>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>商品名称</th>
+                                    <th>商品描述</th>
+                                    <th>价格</th>
+                                    <th>购买</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {shopItemList.map((shopItem, i) => (
+                                    <tr>
+                                        <td>{shopItem.shop_item_id}</td>
+                                        <td>{shopItem.name}</td>
+                                        <td>{shopItem.description}</td>
+                                        <td>{shopItem.price} 金币</td>
+                                        <td>
+                                            <button onClick={() => {
+                                                buy_item(shopItem.shop_item_id, buyCount).then(() => reload());
+                                            }}>购买
+                                            </button>
+                                            <input type="text" value={buyCount} onChange={(e) => setBuyCount(e.target.value)}/>
+                                            个
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div style={{margin: '1em auto'}}>
+                        <div style={{textAlign: 'center'}}>背包</div>
+                        <table className="shop-table" style={{margin: '1em auto'}}>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>道具名称</th>
+                                    <th>说明</th>
+                                    <th>数量</th>
+                                    <th>使用</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {'remove_piece_count' in info && <tr>
+                                    <td>1</td>
+                                    <td>消除道具</td>
+                                    <td>随机消除一个2或4的格子</td>
+                                    <td>{info.remove_piece_count}</td>
+                                    <td>
+                                        <button onClick={() => use_item(1).then(s => reload())}>使用</button>
+                                    </td>
+                                </tr>}
+                                {'double_money_count' in info && <tr>
+                                    <td>2</td>
+                                    <td>双倍金币</td>
+                                    <td>接下来的1次操作获得金币翻倍</td>
+                                    <td>{info.double_money_count}</td>
+                                    <td>
+                                        <button onClick={() => use_item(2).then(s => reload())}>使用</button>
+                                    </td>
+                                </tr>}
+                                {'v50_count' in info && <tr>
+                                    <td>3</td>
+                                    <td>v我50</td>
+                                    <td>诶嘿？</td>
+                                    <td>{info.v50_count}</td>
+                                    <td>
+                                        <button onClick={() => use_item(3).then(s => {
+                                            alert(s);
+                                            reload();
+                                        })}>使用
+                                        </button>
+                                    </td>
+                                </tr>}
+                                {'flag_8_count' in info && <tr>
+                                    <td>4</td>
+                                    <td>消除道具</td>
+                                    <td>获取 flag8 内容</td>
+                                    <td>{info.flag_8_count}</td>
+                                    <td>
+                                        <button onClick={() => use_item(4).then(s => {
+                                            alert(s);
+                                            reload();
+                                        })}>使用
+                                        </button>
+                                    </td>
+                                </tr>}
+                                {'flag_b_count' in info && <tr>
+                                    <td>5</td>
+                                    <td>消除道具</td>
+                                    <td>获取 flagB 内容</td>
+                                    <td>{info.flag_b_count}</td>
+                                    <td>
+                                        <button onClick={() => use_item(5).then(s => {
+                                            alert(s);
+                                            reload();
+                                        })}>使用
+                                        </button>
+                                    </td>
+                                </tr>}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.render(
+            <App/>,
+            document.getElementById('root')
+        );
+    </script>
+</body>
+</html>

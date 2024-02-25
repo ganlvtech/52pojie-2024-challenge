@@ -1,0 +1,20 @@
+<meta charset="UTF-8">
+<button>计算 flag6</button>
+<div id="result"></div>
+<script src="md5.min.js"></script>
+<script>
+    document.querySelector('button').addEventListener('click', () => {
+        const t0 = Date.now();
+        for (let i = 0; i < 1e8; i++) {
+            if ((i & 0x1ffff) === 0x1ffff) {
+                const progress = i / 1e8;
+                const t = Date.now() - t0;
+                console.log(`${(progress * 100).toFixed(2)}% ${Math.floor(t / 1000)}s ETA:${Math.floor(t / progress / 1000)}s`);
+            }
+            if (MD5(String(i)) === '1c450bbafad15ad87c32831fa1a616fc') {
+                document.querySelector('#result').textContent = `flag6{${i}}`;
+                break;
+            }
+        }
+    });
+</script>

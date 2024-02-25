@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <p>开始布置你的魔法阵吧，使用特定物品正确布置阵法即可获得 flagC</p>
+    <p>识别结果：<span id="result"></span></p>
+    <input type="file" value="使用本地图片文件">
+    <button>使用摄像头</button>
+    <div style="position: relative; width: 640px;">
+        <img src="test.png" style="width: 100%">
+        <video autoplay="autoplay" style="display: none; width: 100%"></video>
+        <svg style="position: absolute; left: 0; top: 0; width: 100%; height: 100%"></svg>
+    </div>
+    <script src="tf.min.js"></script>
+    <script>
+        tf.ready().then(() => {
+            tf.loadGraphModel('yolov5n_web_model/model.json').then((yolov5) => {
+                const modelHeight = yolov5.inputs[0].shape[1];
+                const modelWidth = yolov5.inputs[0].shape[2];
+                const imgEl = document.querySelector('img');
+
+                const detectImage = (imgSource) => {
+                    const imgHeight = imgSource instanceof HTMLVideoElement ? imgSource.videoHeight : imgSource.naturalHeight;
+                    const imgWidth = imgSource instanceof HTMLVideoElement ? imgSource.videoWidth : imgSource.naturalWidth;
+                    if (imgHeight === 0 || imgWidth === 0) {
+                        return Promise.resolve();
+                    }
+                    const fittedWidth = Math.min(modelWidth, Math.floor(modelHeight * imgWidth / imgHeight));
+                    const fittedHeight = Math.min(modelHeight, Math.floor(modelWidth * imgHeight / imgWidth));
+                    const input = tf.tidy(() => {
+                        const img = tf.browser.fromPixels(imgSource); // tensor3d [height, width, 3]
+                        return tf.image
+                            .resizeBilinear(img, [fittedHeight, fittedWidth]) // 缩放到合适大小
+                            .pad([[0, modelHeight - fittedHeight], [0, modelWidth - fittedWidth], [0, 0]]) // 填充成方形
+                            .div(255.0) // 归一化
+                            .expandDims(0); // 添加一个 batch 维度
+                    });
+                    const verify = (boxes, scores, classes) => fetch('/flagC/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            boxes,
+                            scores,
+                            classes,
+                        }),
+                        credentials: "include",
+                    }).then((res) => res.json()).then((res) => {
+                        const {hint, labels, colors} = res;
+                        document.querySelector('#result').textContent = hint; // 错误时显示提示，正确时显示 flag
+                        // 绘制识别结果
+                        document.querySelector('svg').setAttribute('viewBox', `0 0 ${1000 * fittedWidth / modelWidth} ${1000 * fittedHeight / modelHeight}`);
+                        document.querySelector('svg').innerHTML = labels.map((label, i) => ({
+                            box: boxes.slice(i * 4, i * 4 + 4),
+                            label,
+                            color: colors[i],
+                        })).filter((item) => item.label !== '').map((item) => `<g>
+ <rect x="${1000 * item.box[0]}" y="${1000 * item.box[1]}" width="${1000 * (item.box[2] - item.box[0])}" height="${1000 * (item.box[3] - item.box[1])}" fill="none" stroke="#${item.color}" stroke-width="2"></rect>
+ <text x="${1000 * item.box[0]}" y="${1000 * item.box[1] - 2}" font-size="${16}" fill="#${item.color}">${item.label}</text>
+ </g>`).join('');
+                    });
+                    return yolov5.executeAsync(input).then((res) => {
+                        const len = res[3].dataSync()[0];
+                        const boxes = Array.from(res[0].dataSync().slice(0, 4 * len));
+                        const scores = Array.from(res[1].dataSync().slice(0, len));
+                        const classes = Array.from(res[2].dataSync().slice(0, len));
+                        tf.dispose(res);
+                        tf.dispose(input);
+                        return verify(boxes, scores, classes);
+                    });
+                };
+
+                document.querySelector('img').addEventListener('load', () => {
+                    detectImage(document.querySelector('img'));
+                });
+                detectImage(document.querySelector('img'));
+
+                document.querySelector('input[type="file"]').addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        document.querySelector('img').style.display = '';
+                        document.querySelector('video').style.display = 'none';
+                        if (document.querySelector('video').srcObject) {
+                            document.querySelector('video').srcObject.getTracks().forEach((track) => {
+                                track.stop();
+                            });
+                            document.querySelector('video').srcObject = null;
+                        }
+                        imgEl.src = URL.createObjectURL(e.target.files[0]);
+                    }
+                });
+                document.querySelector('button').addEventListener('click', (e) => {
+                    navigator.mediaDevices
+                        .getUserMedia({
+                            audio: false,
+                            video: {
+                                facingMode: "environment",
+                            },
+                        })
+                        .then((stream) => {
+                            document.querySelector('img').style.display = 'none';
+                            document.querySelector('video').style.display = '';
+                            document.querySelector('video').srcObject = stream;
+                            const detectVideo = () => {
+                                detectImage(document.querySelector('video')).then(() => {
+                                    requestAnimationFrame(detectVideo);
+                                });
+                            }
+                            detectVideo();
+                        });
+                });
+            });
+        });
+    </script>
+</body>
+</html>

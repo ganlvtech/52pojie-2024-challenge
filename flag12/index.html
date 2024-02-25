@@ -1,0 +1,20 @@
+<meta charset="UTF-8">
+<title>flag12</title>
+<p>输入密码查看 flag12 (密码范围: 0 ~ 4294967295)<input type="text"><button>提交</button></p>
+<script>
+    WebAssembly.instantiateStreaming(fetch('target/wasm32-unknown-unknown/release/flag12.wasm'))
+        .then(({ instance }) => {
+            const get_flag12 = (secret) => {
+                let result = instance.exports.get_flag12(secret);
+                let s = '';
+                while (result > 0) {
+                    s = String.fromCodePoint(result & 0xff) + s;
+                    result >>= 8;
+                }
+                return `flag12{${s}}`;
+            }
+            document.querySelector('button').addEventListener('click', () => {
+                alert(get_flag12(parseInt(document.querySelector('input').value)));
+            });
+        })
+</script>
